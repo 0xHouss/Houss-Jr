@@ -5,21 +5,12 @@ from nextcord.ext.commands import Cog, Bot
 from nextcord.ext import application_checks
 from nextcord.abc import GuildChannel
 from nextcord import (
-    Button,
-    ButtonStyle,
-    Colour,
     Embed,
     Interaction,
     Member,
-    SelectOption,
     SlashOption,
     Message,
-    TextChannel,
-    TextInputStyle,
-    User,
-    ui,
-    utils,
-    PartialInteractionMessage,
+    Color,
     slash_command,
 )
 
@@ -30,10 +21,14 @@ import asyncio
 class Giveaways(Cog):
     def __init__(self, client: Bot) -> None:
         self.client = client
+    
+    @slash_command(name="giveaway")
+    async def giveaway(self, interaction: Interaction):
+        return
 
-    @slash_command()
     @application_checks.is_owner()
-    async def giveaway(
+    @giveaway.subcommand(name="start", description="To start a giveaway")
+    async def start(
         self,
         interaction: Interaction,
         duration: int = SlashOption(
@@ -57,7 +52,7 @@ class Giveaways(Cog):
         embed = Embed(
             title="There is a Giveaway!",
             description=f"React with the 🎉 emoji to try to win the prize",
-            color=nextcord.Colour.green(),
+            color=Color.green(),
         )
         embed.set_author(
             name=interaction.user.name, icon_url=interaction.user.display_avatar
@@ -72,7 +67,7 @@ class Giveaways(Cog):
         confirmation = Embed(
             title=f"Giveaway!",
             description=f"Giveaway started in {channel.mention}",
-            color=nextcord.Colour.green(),
+            color=Color.green(),
         )
 
         await interaction.response.send_message(embed=confirmation, ephemeral=True)
@@ -101,7 +96,7 @@ class Giveaways(Cog):
         end = Embed(
             title="Giveaway ended!",
             description="The winners are:",
-            color=nextcord.Colour.green(),
+            color=Color.green(),
         )
 
         embed.set_author(

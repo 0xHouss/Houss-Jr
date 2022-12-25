@@ -9,7 +9,6 @@ from nextcord.ext.application_checks import errors as application_errors
 
 import aiosqlite
 
-
 class Client(Bot):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

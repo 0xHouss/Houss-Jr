@@ -1,25 +1,16 @@
-import nextcord
+import asyncio
 
 from nextcord.ext.commands import Cog, Bot
 
+from nextcord.abc import GuildChannel
 from nextcord.ext import application_checks
 from nextcord import (
-    Button,
-    ButtonStyle,
     Member,
-    Colour,
     Embed,
+    SlashOption,
+    Color,
     Interaction,
     Member,
-    SelectOption,
-    SlashOption,
-    User,
-    TextChannel,
-    TextInputStyle,
-    User,
-    ui,
-    utils,
-    PartialInteractionMessage,
     slash_command,
 )
 
@@ -28,12 +19,17 @@ class Moderation(Cog):
     def __init__(self, client: Bot) -> None:
         self.client = client
 
-    @slash_command(name="whois", description="Get user infos")
+    @application_checks.is_owner()
+    @slash_command(name="who")
+    async def who(self, interaction: Interaction):
+        return
+
+    @who.subcommand(name="is", description="Get user's infos")
     async def who_is(self, interaction: Interaction, member: Member):
         embed = Embed(
             title=member.name,
             description=member.mention,
-            color=member.accent_colour if member.accent_colour else member.colour,
+            color=member.accent_color if member.accent_color else member.color,
         )
         embed.add_field(name="ID", value=member.id, inline=False)
         embed.add_field(
@@ -53,7 +49,30 @@ class Moderation(Cog):
             icon_url=interaction.user.display_avatar,
             text=f"Requested by {interaction.user.name}",
         )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.send(embed=embed)
+
+    @application_checks.is_owner()
+    @slash_command(name="clear", description="To clear the channel")
+    async def clear(
+            self, 
+            interaction: Interaction, 
+            channel: GuildChannel = SlashOption(name="channel", description="The channel to clear", required=False),
+            limit: int = SlashOption(name="limit", description="Number of messages to clear", required=False)
+            ):
+
+        if not channel: channel = interaction.channel
+
+        await interaction.response.defer()
+
+        await channel.purge(limit=int(limit) if limit else None)
+
+        embed = Embed(title="The channel has been cleared", color=Color.green())
+        embed.set_footer(icon_url=interaction.user.avatar.url,
+                     text=f"Cleared by {interaction.user.name}")
+
+        response = await interaction.send(embed=embed)
+        await asyncio.sleep(5)
+        await response.delete()
 
 
 def setup(client: Bot):
