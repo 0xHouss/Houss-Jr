@@ -58,7 +58,7 @@ class Warnings(Cog):
         )
 
         warned = Embed(
-            Color=Color.green(),
+            color=Color.green(),
             title="Warned!",
             description=f"{member.mention} was warned {f'for: `{reason}`!' if reason else '!'}",
         )
@@ -66,13 +66,16 @@ class Warnings(Cog):
             name=self.client.user.display_name, icon_url=self.client.user.display_avatar
         )
         warned.set_thumbnail(url=member.display_avatar)
-        warned.set_footer(text=f"Requested by {interaction.user.name}", icon_url=interaction.user.display_avatar)
+        warned.set_footer(
+            text=f"Requested by {interaction.user.name}",
+            icon_url=interaction.user.display_avatar,
+        )
         await interaction.send(embed=warned)
 
         warned = Embed(
-            Color=Color.yellow(),
+            color=Color.yellow(),
             title="Warned!",
-            description=f"You have been warned from {interaction.guild.name} {f'for: `{reason}`!' if reason else '!'}",
+            description=f"You have been warned in {interaction.guild.name} {f'for: `{reason}`!' if reason else '!'}",
         )
         warned.set_author(
             name=interaction.user.name, icon_url=interaction.user.display_avatar
@@ -93,7 +96,7 @@ class Warnings(Cog):
 
         if len(warnings) == 3:
             kicked = Embed(
-                Color=Color.yellow(),
+                color=Color.yellow(),
                 title="Kicked!",
                 description=f"{member.mention} was kicked for being warned 3 times!",
             )
@@ -105,9 +108,9 @@ class Warnings(Cog):
             await interaction.send(embed=kicked)
 
             kicked = Embed(
-                Color=Color.yellow(),
+                color=Color.yellow(),
                 title="Kicked!",
-                description=f"You have been kicked from {interaction.guild.name} for being warned 3 times!",
+                description=f"You have been kicked in {interaction.guild.name} for being warned 3 times!",
             )
             kicked.set_author(
                 name=self.client.user.display_name,
@@ -120,7 +123,7 @@ class Warnings(Cog):
 
         elif len(warnings) > 3:
             banned = Embed(
-                Color=Color.red(),
+                color=Color.red(),
                 title="Banned!",
                 description=f"{member.mention} was banned for being warned 4 times!",
             )
@@ -132,9 +135,9 @@ class Warnings(Cog):
             await interaction.send(embed=banned)
 
             banned = Embed(
-                Color=Color.red(),
+                color=Color.red(),
                 title="Banned!",
-                description=f"You have been banned from {interaction.guild.name} for being warned 4 times!",
+                description=f"You have been banned in {interaction.guild.name} for being warned 4 times!",
             )
             banned.set_author(
                 name=self.client.user.display_name,
@@ -158,7 +161,7 @@ class Warnings(Cog):
         interaction: Interaction,
         member: Member = SlashOption(
             name="member", description="The member to clear his warnings", required=True
-        )
+        ),
     ):
 
         curr = await self.client.db.cursor()
@@ -175,18 +178,31 @@ class Warnings(Cog):
                 (member.id, interaction.guild_id),
             )
 
-            cleared = Embed(Color=Color.green(), title="Warnings Cleared!", description=f"{member.mention} warnings have been cleared!")
+            cleared = Embed(
+                color=Color.green(),
+                title="Warnings Cleared!",
+                description=f"{member.mention} warnings have been cleared!",
+            )
             cleared.set_author(
-            name=self.client.user.display_name, icon_url=self.client.user.display_avatar
+                name=self.client.user.display_name,
+                icon_url=self.client.user.display_avatar,
             )
             cleared.set_thumbnail(url=member.display_avatar)
-            cleared.set_footer(text=f"Requested by {interaction.user.name}", icon_url=interaction.user.display_avatar)
+            cleared.set_footer(
+                text=f"Requested by {interaction.user.name}",
+                icon_url=interaction.user.display_avatar,
+            )
             await interaction.send(embed=cleared)
 
         else:
-            no_warnings = Embed(Color=Color.red(), title="No Warnings!", description=f"{member.mention} has no warnings!")
+            no_warnings = Embed(
+                color=Color.red(),
+                title="No Warnings!",
+                description=f"{member.mention} has no warnings!",
+            )
             no_warnings.set_author(
-            name=self.client.user.display_name, icon_url=self.client.user.display_avatar
+                name=self.client.user.display_name,
+                icon_url=self.client.user.display_avatar,
             )
             no_warnings.set_thumbnail(url=member.display_avatar)
             await interaction.response.send_message(embed=no_warnings, ephemeral=True)
@@ -199,7 +215,7 @@ class Warnings(Cog):
         interaction: Interaction,
         member: Member = SlashOption(
             name="member", description="The member to list his warnings", required=True
-        )
+        ),
     ):
 
         curr = await self.client.db.cursor()
@@ -209,24 +225,112 @@ class Warnings(Cog):
         )
 
         warnings = await curr.fetchall()
-        print(warnings)
         if warnings:
-            warnings_list = Embed(Color=Color.green(), title="User Warnings", description=f"{member.mention} warnings:")
-
+            warnings_list = Embed(
+                color=Color.green(),
+                title="User Warnings",
+                description=f"{member.mention} warnings:",
+            )
+            i = 1
             for id, userId, guildId, reason, datetime in warnings:
-                warnings_list.add_field(name=f"Reason: {reason}", value=f"Date: {str(datetime).split('.')[0]}")
+                warnings_list.add_field(
+                    name=f"Warning: {i}",
+                    value=f"Reason: {reason}\nDate: {str(datetime).split('.')[0]}",
+                    inline=False,
+                )
+                i += 1
 
             warnings_list.set_author(
-            name=self.client.user.display_name, icon_url=self.client.user.display_avatar
+                name=self.client.user.display_name,
+                icon_url=self.client.user.display_avatar,
             )
             warnings_list.set_thumbnail(url=member.display_avatar)
-            warnings_list.set_footer(text=f"Requested by {interaction.user.name}", icon_url=interaction.user.display_avatar)
+            warnings_list.set_footer(
+                text=f"Requested by {interaction.user.name}",
+                icon_url=interaction.user.display_avatar,
+            )
             await interaction.send(embed=warnings_list)
 
         else:
-            no_warnings = Embed(Color=Color.red(), title="No Warnings!", description=f"{member.mention} has no warnings!")
+            no_warnings = Embed(
+                color=Color.red(),
+                title="No Warnings!",
+                description=f"{member.mention} has no warnings!",
+            )
             no_warnings.set_author(
-            name=self.client.user.display_name, icon_url=self.client.user.display_avatar
+                name=self.client.user.display_name,
+                icon_url=self.client.user.display_avatar,
+            )
+            no_warnings.set_thumbnail(url=member.display_avatar)
+            await interaction.response.send_message(embed=no_warnings, ephemeral=True)
+
+        await self.client.db.commit()
+
+    @warn.subcommand(name="remove", description="Remove a user's warning")
+    async def remove(
+        self,
+        interaction: Interaction,
+        member: Member = SlashOption(
+            name="member", description="The member to remove a warning", required=True
+        ),
+        number: int = SlashOption(
+            name="id",
+            description="The number of the warning to remove (use /warn list to see the warnings",
+            required=True,
+        ),
+    ):
+        curr = await self.client.db.cursor()
+        await curr.execute(
+            """SELECT * FROM "warnings" WHERE userId = ? AND guildId = ?""",
+            (member.id, interaction.guild_id),
+        )
+
+        warnings = await curr.fetchall()
+        if warnings:
+            if number - 1 in range(len(warnings)):
+                await curr.execute(
+                    """DELETE FROM "warnings" WHERE id = ?""",
+                    (warnings[number - 1][0],),
+                )
+
+                deleted = Embed(
+                    color=Color.green(),
+                    title="Warning Deleted!",
+                    description=f"{member.mention}'s warning {number} has been deleted!",
+                )
+                deleted.set_author(
+                    name=self.client.user.display_name,
+                    icon_url=self.client.user.display_avatar,
+                )
+                deleted.set_thumbnail(url=member.display_avatar)
+                deleted.set_footer(
+                    text=f"Requested by {interaction.user.name}",
+                    icon_url=interaction.user.display_avatar,
+                )
+                await interaction.send(embed=deleted)
+            else:
+                no_warnings = Embed(
+                    color=Color.red(),
+                    title="Wrong ID!",
+                    description=f"{member.mention} has no warning with id {number}!",
+                )
+                no_warnings.set_author(
+                    name=self.client.user.display_name,
+                    icon_url=self.client.user.display_avatar,
+                )
+                no_warnings.set_thumbnail(url=member.display_avatar)
+                await interaction.response.send_message(
+                    embed=no_warnings, ephemeral=True
+                )
+        else:
+            no_warnings = Embed(
+                color=Color.red(),
+                title="No Warnings!",
+                description=f"{member.mention} has no warnings!",
+            )
+            no_warnings.set_author(
+                name=self.client.user.display_name,
+                icon_url=self.client.user.display_avatar,
             )
             no_warnings.set_thumbnail(url=member.display_avatar)
             await interaction.response.send_message(embed=no_warnings, ephemeral=True)

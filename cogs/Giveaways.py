@@ -1,4 +1,4 @@
-import nextcord
+from datetime import datetime, timedelta
 
 from nextcord.ext.commands import Cog, Bot
 
@@ -21,7 +21,26 @@ import asyncio
 class Giveaways(Cog):
     def __init__(self, client: Bot) -> None:
         self.client = client
-    
+
+    @Cog.listener()
+    async def on_ready(self):
+        await asyncio.sleep(2)
+        curr = await self.client.db.cursor()
+        await curr.execute(
+            """CREATE TABLE IF NOT EXISTS "giveaways" (
+                    "id"	INTEGER NOT NULL UNIQUE,
+                    "channelId"	INTEGER NOT NULL,
+                    "guildId"	INTEGER NOT NULL,
+                    "numberOfWinners" INTEGER NOT NULL,
+                    "winners"	TEXT NOT NULL,
+                    "prize"	TEXT NOT NULL,
+                    "start"  TIMESTAMP NOT NULL,
+                    "end"  TIMESTAMP NOT NULL,
+                    PRIMARY KEY("id" AUTOINCREMENT)
+                );"""
+        )
+        await self.client.db.commit()
+
     @slash_command(name="giveaway")
     async def giveaway(self, interaction: Interaction):
         return
@@ -49,6 +68,9 @@ class Giveaways(Cog):
         ),
     ):
 
+        start = datetime.now()
+        end = start + timedelta(seconds=duration)
+
         embed = Embed(
             title="There is a Giveaway!",
             description=f"React with the 🎉 emoji to try to win the prize",
@@ -59,7 +81,7 @@ class Giveaways(Cog):
         )
         embed.add_field(name="Prize: ", value=prize)
         embed.add_field(name="Number of winners: ", value=winners_num)
-        embed.set_footer(text=f"Ends in {duration}!")
+        embed.set_footer(text=f"Ends at {str(end).split('.')[0]}!")
 
         if not channel:
             channel = interaction.channel
@@ -99,7 +121,7 @@ class Giveaways(Cog):
             color=Color.green(),
         )
 
-        embed.set_author(
+        end.set_author(
             name=interaction.user.name, icon_url=interaction.user.display_avatar
         )
 
@@ -109,6 +131,38 @@ class Giveaways(Cog):
         end.set_footer(text=f"They have won: {prize}")
 
         await channel.send(embed=end)
+
+        curr = await self.client.db.cursor()
+        await curr.execute(
+            """INSERT INTO "giveaways" (channelId, guildId, numberOfWinners, winners, start, end) VALUES (?, ?, ?, ?, ?, ?);""",
+            (
+                channel.id,
+                channel.guild.id,
+                winners_num,
+                ",".join([winner.id for winner in winners]),
+                start,
+                end,
+            ),
+        )
+
+        await self.client.db.commit()
+
+    @giveaway.subcommand(name="clear", description="Delete all giveaways")
+    async def clear(
+        self,
+        interaction: Interaction,
+        channel: GuildChannel = SlashOption(
+            name="channel",
+            description="The channel to clear it's giveaways",
+            required=False,
+        ),
+    ):
+        curr = await self.client.db.cursor()
+        await curr.execute(
+            f"""DELETE FROM "giveaways" WHERE guildId = ? {'AND channelId = ?' if channel else ''}""",
+            (interaction.guild.id, channel.id) if channel else (interaction.guild.id,),
+        )
+        await self.client.db.commit()
 
 
 def setup(client: Bot):

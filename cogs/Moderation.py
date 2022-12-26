@@ -54,23 +54,32 @@ class Moderation(Cog):
     @application_checks.is_owner()
     @slash_command(name="clear", description="To clear the channel")
     async def clear(
-            self, 
-            interaction: Interaction, 
-            channel: GuildChannel = SlashOption(name="channel", description="The channel to clear", required=False),
-            limit: int = SlashOption(name="limit", description="Number of messages to clear", required=False)
-            ):
+        self,
+        interaction: Interaction,
+        channel: GuildChannel = SlashOption(
+            name="channel", description="The channel to clear", required=False
+        ),
+        limit: int = SlashOption(
+            name="limit", description="Number of messages to clear", required=False
+        ),
+    ):
 
         if not channel: channel = interaction.channel
 
-        await interaction.response.defer()
+        clearing = Embed(title="Clearing the channel...", color=Color.green())
+
+        await interaction.send(embed=clearing)
 
         await channel.purge(limit=int(limit) if limit else None)
+        
+        cleared = Embed(title="The channel has been cleared", color=Color.green())
+        cleared.set_footer(
+            icon_url=interaction.user.avatar.url,
+            text=f"Cleared by {interaction.user.name}",
+        )
 
-        embed = Embed(title="The channel has been cleared", color=Color.green())
-        embed.set_footer(icon_url=interaction.user.avatar.url,
-                     text=f"Cleared by {interaction.user.name}")
+        response = await interaction.followup.send(embed=cleared)
 
-        response = await interaction.send(embed=embed)
         await asyncio.sleep(5)
         await response.delete()
 
