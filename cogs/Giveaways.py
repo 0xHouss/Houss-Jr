@@ -31,7 +31,7 @@ class Giveaways(Cog):
                     "id"	INTEGER NOT NULL UNIQUE,
                     "channelId"	INTEGER NOT NULL,
                     "guildId"	INTEGER NOT NULL,
-                    "numberOfWinners" INTEGER NOT NULL,
+                    "authorId"  INTEGER NOT NULL,
                     "winners"	TEXT NOT NULL,
                     "prize"	TEXT NOT NULL,
                     "start"  TIMESTAMP NOT NULL,
@@ -45,7 +45,7 @@ class Giveaways(Cog):
     async def giveaway(self, interaction: Interaction):
         return
 
-    @application_checks.is_owner()
+    
     @giveaway.subcommand(name="start", description="To start a giveaway")
     async def start(
         self,
@@ -81,7 +81,7 @@ class Giveaways(Cog):
         )
         embed.add_field(name="Prize: ", value=prize)
         embed.add_field(name="Number of winners: ", value=winners_num)
-        embed.set_footer(text=f"Ends at {str(end).split('.')[0]}!")
+        embed.set_footer(text=f"Ends the {end.strftime('%d/%m/%Y at %H:%M:%S')}!")
 
         if not channel:
             channel = interaction.channel
@@ -89,7 +89,7 @@ class Giveaways(Cog):
         confirmation = Embed(
             title=f"Giveaway!",
             description=f"Giveaway started in {channel.mention}",
-            color=Color.green(),
+            color=Color.blue(),
         )
 
         await interaction.response.send_message(embed=confirmation, ephemeral=True)
@@ -115,31 +115,32 @@ class Giveaways(Cog):
             participants.remove(winner)
             winners.append(winner)
 
-        end = Embed(
+        ended = Embed(
             title="Giveaway ended!",
             description="The winners are:",
-            color=Color.green(),
+            color=Color.blue(),
         )
 
-        end.set_author(
+        ended.set_author(
             name=interaction.user.name, icon_url=interaction.user.display_avatar
         )
 
         for i, winner in enumerate(winners):
-            end.add_field(name=f"Winner {i+1}:", value=winner.mention)
+            ended.add_field(name=f"Winner {i+1}:", value=winner.mention)
 
-        end.set_footer(text=f"They have won: {prize}")
+        ended.set_footer(text=f"They have won: {prize}")
 
-        await channel.send(embed=end)
+        await channel.send(embed=ended)
 
         curr = await self.client.db.cursor()
         await curr.execute(
-            """INSERT INTO "giveaways" (channelId, guildId, numberOfWinners, winners, start, end) VALUES (?, ?, ?, ?, ?, ?);""",
+            """INSERT INTO "giveaways" (channelId, guildId, authorId, winners, prize, start, end) VALUES (?, ?, ?, ?, ?, ?, ?);""",
             (
                 channel.id,
                 channel.guild.id,
-                winners_num,
-                ",".join([winner.id for winner in winners]),
+                interaction.user.id,
+                ",".join([str(winner.id) for winner in winners]) if winners else "",
+                prize,
                 start,
                 end,
             ),
@@ -158,10 +159,175 @@ class Giveaways(Cog):
         ),
     ):
         curr = await self.client.db.cursor()
+
         await curr.execute(
-            f"""DELETE FROM "giveaways" WHERE guildId = ? {'AND channelId = ?' if channel else ''}""",
+            f"""SELECT * FROM "giveaways" WHERE guildId = ? {'AND channelId = ?' if channel else ''}""",
             (interaction.guild.id, channel.id) if channel else (interaction.guild.id,),
         )
+
+        giveaways = await curr.fetchall()
+
+        if giveaways:
+            await curr.execute(
+                f"""DELETE FROM "giveaways" WHERE guildId = ? {'AND channelId = ?' if channel else ''}""",
+                (interaction.guild.id, channel.id)
+                if channel
+                else (interaction.guild.id,),
+            )
+            await self.client.db.commit()
+
+            cleared = Embed(
+                color=Color.green(),
+                title="Giveaways cleared!",
+                description=f"{f'{channel.mention} g' if channel else 'G'}iveaways have been cleared!",
+            )
+            cleared.set_author(
+                name=self.client.user.display_name,
+                icon_url=self.client.user.display_avatar,
+            )
+            cleared.set_thumbnail(url=interaction.guild.icon)
+            cleared.set_footer(
+                text=f"Requested by {interaction.user.name}",
+                icon_url=interaction.user.display_avatar,
+            )
+            await interaction.send(embed=cleared)
+        else:
+            no_giveaways = Embed(
+                color=Color.red(),
+                title="No giveaways!",
+                description=f"No giveaways have been started{f' in {channel.mention}' if channel else ''}!",
+            )
+            no_giveaways.set_author(
+                name=self.client.user.display_name,
+                icon_url=self.client.user.display_avatar,
+            )
+            await interaction.response.send_message(embed=no_giveaways, ephemeral=True)
+
+    @giveaway.subcommand(name="list", description="List giveaways")
+    async def list(
+        self,
+        interaction: Interaction,
+        channel: GuildChannel = SlashOption(
+            name="channel",
+            description="The channel to list it's giveaways",
+            required=False,
+        ),
+    ):
+        curr = await self.client.db.cursor()
+
+        await curr.execute(
+            f"""SELECT * FROM "giveaways" WHERE guildId = ? {'AND channelId = ?' if channel else ''}""",
+            (interaction.guild.id, channel.id) if channel else (interaction.guild.id,),
+        )
+
+        giveaways = await curr.fetchall()
+
+        if giveaways:
+            giveaways_list = Embed(
+                color=Color.green(),
+                title=f"{channel.name if channel else'Guild'} Giveaways",
+                description=f"{channel.mention if channel else interaction.guild.name} giveaways:",
+            )
+            for (
+                id,
+                channelId,
+                guildId,
+                authorId,
+                winners,
+                prize,
+                start,
+                end,
+            ) in giveaways:
+                parser = lambda x: datetime.strptime(
+                    x, "%Y-%m-%d %H:%M:%S.%f"
+                ).strftime("%d/%m/%Y at %H:%M:%S")
+
+                giveaways_list.add_field(
+                    name=f"Giveaway {id}",
+                    value=f"""
+                    From {parser(start)} to {parser(end)}
+                    By: {interaction.guild.get_member(authorId).mention}
+                    Winners: {', '.join([interaction.guild.get_member(int(winner)).mention for winner in winners.split(',')])}
+                    Prize: {prize}""",
+                    inline=False,
+                )
+
+            giveaways_list.set_author(
+                name=self.client.user.display_name,
+                icon_url=self.client.user.display_avatar,
+            )
+            giveaways_list.set_thumbnail(url=interaction.guild.icon)
+            giveaways_list.set_footer(
+                text=f"Requested by {interaction.user.name}",
+                icon_url=interaction.user.display_avatar,
+            )
+            await interaction.send(embed=giveaways_list)
+
+        else:
+            no_giveaways = Embed(
+                color=Color.red(),
+                title="No giveaways!",
+                description=f"No giveaways have been started{f' in {channel.mention}' if channel else ''}!",
+            )
+            no_giveaways.set_author(
+                name=self.client.user.display_name,
+                icon_url=self.client.user.display_avatar,
+            )
+            await interaction.response.send_message(embed=no_giveaways, ephemeral=True)
+
+        await self.client.db.commit()
+
+    @giveaway.subcommand(name="remove", description="Remove a user's warning")
+    async def remove(
+        self,
+        interaction: Interaction,
+        id: int = SlashOption(
+            name="id",
+            description="The id of the giveaway to remove (use /giveaway list to see the giveaways",
+            required=True,
+        ),
+    ):
+        curr = await self.client.db.cursor()
+        await curr.execute(
+            """SELECT * FROM "giveaways" WHERE id = ?""",
+            (id,),
+        )
+
+        giveaways = await curr.fetchall()
+        if giveaways:
+            await curr.execute(
+                """DELETE FROM "giveaways" WHERE id = ?""",
+                (id,),
+            )
+
+            deleted = Embed(
+                color=Color.green(),
+                title="Giveaway Deleted!",
+                description=f"Giveaway {id} has been deleted!",
+            )
+            deleted.set_author(
+                name=self.client.user.display_name,
+                icon_url=self.client.user.display_avatar,
+            )
+            deleted.set_thumbnail(url=interaction.guild.icon)
+            deleted.set_footer(
+                text=f"Requested by {interaction.user.name}",
+                icon_url=interaction.user.display_avatar,
+            )
+            await interaction.send(embed=deleted)
+        else:
+            no_warnings = Embed(
+                color=Color.red(),
+                title="No Giveaway!",
+                description=f"No giveaway with id: {id}!",
+            )
+            no_warnings.set_author(
+                name=self.client.user.display_name,
+                icon_url=self.client.user.display_avatar,
+            )
+            no_warnings.set_thumbnail(url=interaction.guild.icon)
+            await interaction.response.send_message(embed=no_warnings, ephemeral=True)
+
         await self.client.db.commit()
 
 

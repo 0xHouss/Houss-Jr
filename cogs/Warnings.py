@@ -34,12 +34,12 @@ class Warnings(Cog):
         )
         await self.client.db.commit()
 
-    @application_checks.is_owner()
+    
     @slash_command(name="warn")
     async def warn(self, interaction: Interaction):
         return
 
-    @application_checks.is_owner()
+    
     @warn.subcommand(name="give", description="Warn a user")
     async def give(
         self,
@@ -63,13 +63,10 @@ class Warnings(Cog):
             description=f"{member.mention} was warned {f'for: `{reason}`!' if reason else '!'}",
         )
         warned.set_author(
-            name=self.client.user.display_name, icon_url=self.client.user.display_avatar
-        )
-        warned.set_thumbnail(url=member.display_avatar)
-        warned.set_footer(
-            text=f"Requested by {interaction.user.name}",
+            name=interaction.user.name,
             icon_url=interaction.user.display_avatar,
         )
+        warned.set_thumbnail(url=member.display_avatar)
         await interaction.send(embed=warned)
 
         warned = Embed(
@@ -81,10 +78,6 @@ class Warnings(Cog):
             name=interaction.user.name, icon_url=interaction.user.display_avatar
         )
         warned.set_thumbnail(url=interaction.guild.icon)
-        warned.set_footer(
-            text=f"warned by {interaction.user.name}",
-            icon_url=interaction.user.display_avatar,
-        )
         await member.send(embed=warned)
 
         await curr.execute(
@@ -98,8 +91,10 @@ class Warnings(Cog):
             kicked = Embed(
                 color=Color.yellow(),
                 title="Kicked!",
-                description=f"{member.mention} was kicked for being warned 3 times!",
+                description=f"{member.mention} was kicked from the server!",
             )
+            if reason:
+                kicked.add_field(name="Reason", value="3 Warnings")
             kicked.set_author(
                 name=self.client.user.display_name,
                 icon_url=self.client.user.display_avatar,
@@ -110,8 +105,10 @@ class Warnings(Cog):
             kicked = Embed(
                 color=Color.yellow(),
                 title="Kicked!",
-                description=f"You have been kicked in {interaction.guild.name} for being warned 3 times!",
+                description=f"You have been kicked from the server: **{interaction.guild.name}**!",
             )
+            if reason:
+                kicked.add_field(name="Reason", value="3 Warnings")
             kicked.set_author(
                 name=self.client.user.display_name,
                 icon_url=self.client.user.display_avatar,
@@ -125,8 +122,10 @@ class Warnings(Cog):
             banned = Embed(
                 color=Color.red(),
                 title="Banned!",
-                description=f"{member.mention} was banned for being warned 4 times!",
+                description=f"{member.mention} was banned from the server!",
             )
+            if reason:
+                banned.add_field(name="Reason", value="4 Warnings")
             banned.set_author(
                 name=self.client.user.display_name,
                 icon_url=self.client.user.display_avatar,
@@ -137,8 +136,10 @@ class Warnings(Cog):
             banned = Embed(
                 color=Color.red(),
                 title="Banned!",
-                description=f"You have been banned in {interaction.guild.name} for being warned 4 times!",
+                description=f"You have been banned from the server: **{interaction.guild.name}**!",
             )
+            if reason:
+                banned.add_field(name="Reason", value="4 Warnings")
             banned.set_author(
                 name=self.client.user.display_name,
                 icon_url=self.client.user.display_avatar,
@@ -231,11 +232,19 @@ class Warnings(Cog):
                 title="User Warnings",
                 description=f"{member.mention} warnings:",
             )
+
+            parser = lambda x: datetime.strptime(
+                    x, "%Y-%m-%d %H:%M:%S.%f"
+                ).strftime("%d/%m/%Y at %H:%M:%S")
+
             i = 1
-            for id, userId, guildId, reason, datetime in warnings:
+            for id, userId, guildId, reason, time in warnings:
                 warnings_list.add_field(
-                    name=f"Warning: {i}",
-                    value=f"Reason: {reason}\nDate: {str(datetime).split('.')[0]}",
+                    name=f"Warning {i}",
+                    value=f"""
+                        Reason: {reason}
+                        Date: {parser(time)}
+                    """,
                     inline=False,
                 )
                 i += 1
