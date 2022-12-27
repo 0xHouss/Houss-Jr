@@ -45,7 +45,6 @@ class Giveaways(Cog):
     async def giveaway(self, interaction: Interaction):
         return
 
-    
     @giveaway.subcommand(name="start", description="To start a giveaway")
     async def start(
         self,

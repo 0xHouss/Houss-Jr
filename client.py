@@ -9,15 +9,25 @@ from nextcord.ext.application_checks import errors as application_errors
 
 import aiosqlite
 
+
 class Client(Bot):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.load_extensions()
+        self.loop.create_task(self.load_extensions())
 
-    def load_extensions(self) -> None:
+    async def load_extensions(self) -> None:
+        loaded = []
         for filename in os.listdir("./cogs"):
             if filename.endswith(".py"):
                 self.load_extension(f"cogs.{filename[:-3]}")
+                print(f"system: {filename[:-3]} cog loaded.")
+                loaded.append(filename[:-3])
+        return loaded
+
+    async def unload_extensions(self) -> None:
+        for filename in os.listdir("./cogs"):
+            if filename.endswith(".py"):
+                self.unload_extension(f"cogs.{filename[:-3]}")
                 print(f"system: {filename[:-3]} cog loaded.")
 
     async def on_ready(self):

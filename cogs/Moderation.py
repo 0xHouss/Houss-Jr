@@ -13,7 +13,10 @@ from nextcord import (
     Interaction,
     Member,
     slash_command,
+    utils,
 )
+
+from datetime import timedelta
 
 
 class Moderation(Cog):
@@ -51,7 +54,8 @@ class Moderation(Cog):
         )
         await interaction.send(embed=embed)
 
-    @slash_command(name="clear", description="To clear the channel")
+    @application_checks.has_permissions(manage_messages=True)
+    @slash_command(name="clear", description="To clear a channel")
     async def clear(
         self,
         interaction: Interaction,
@@ -73,16 +77,19 @@ class Moderation(Cog):
         await channel.purge(limit=int(limit) if limit else None)
 
         cleared = Embed(title="The channel has been cleared", color=Color.green())
-        cleared.set_footer(
+        cleared.set_author(
             icon_url=interaction.user.avatar.url,
-            text=f"Cleared by {interaction.user.name}",
+            name=interaction.user.name,
         )
 
         response = await interaction.followup.send(embed=cleared)
 
         await asyncio.sleep(5)
+        if channel != interaction.channel:
+            await clearing.delete()
         await response.delete()
 
+    @application_checks.has_permissions(kick_members=True)
     @slash_command(name="kick", description="To kick a member")
     async def kick(
         self,
@@ -126,6 +133,7 @@ class Moderation(Cog):
 
         # await member.kick(reason=reason)
 
+    @application_checks.has_permissions(ban_members=True)
     @slash_command(name="ban", description="To ban a member")
     async def ban(
         self,
@@ -150,7 +158,7 @@ class Moderation(Cog):
         await interaction.send(embed=banned)
 
         banned = Embed(
-            color=Color.yellow(),
+            color=Color.red(),
             title="Banned!",
             description=f"You have been banned from the server: **{interaction.guild.name}**!",
         )
@@ -165,6 +173,7 @@ class Moderation(Cog):
 
         # await member.ban(reason=reason)
 
+    @application_checks.has_permissions(ban_members=True)
     @slash_command(name="unban", description="To unban a user")
     async def unban(
         self,
@@ -177,7 +186,7 @@ class Moderation(Cog):
         ),
     ):
         unbanned = Embed(
-            color=Color.red(),
+            color=Color.green(),
             title="Unbanned!",
             description=f"{user.mention} was unbanned from the server!",
         )
@@ -190,10 +199,10 @@ class Moderation(Cog):
         unbanned.set_thumbnail(url=user.display_avatar)
         await interaction.send(embed=unbanned)
 
-        await interaction.guild.unban(user=user)
+        # await interaction.guild.unban(user=user)
 
         unbanned = Embed(
-            color=Color.yellow(),
+            color=Color.green(),
             title="Unbanned!",
             description=f"You have been unbanned from the server: **{interaction.guild.name}**!",
         )
@@ -206,13 +215,94 @@ class Moderation(Cog):
         unbanned.set_thumbnail(url=interaction.guild.icon)
         await user.send(embed=unbanned)
 
-    # @slash_command(name="", description="")
-    # async def cmd(self, interaction: Interaction):
-    #     return
+    @application_checks.has_permissions(kick_members=True)
+    @slash_command(name="mute", description="To timeout a user")
+    async def mute(
+        self,
+        interaction: Interaction,
+        member: Member = SlashOption(
+            name="member", description="The member to timeout", required=True
+        ),
+        duration: int = SlashOption(
+            name="duration", description="The duration of the timeout", required=True
+        ),
+        reason: str = SlashOption(
+            name="reason", description="The reason of the timeout", required=False
+        ),
+    ):
+        await member.edit(timeout=utils.utcnow() + timedelta(seconds=duration))
 
-    # @slash_command(name="", description="")
-    # async def cmd(self, interaction: Interaction):
-    #     return
+        muted = Embed(
+            color=Color.yellow(),
+            title="Muted!",
+            description=f"{member.mention} was muted in the server!",
+        )
+        muted.add_field(name="Duration", value=f"{duration}s")
+        if reason:
+            muted.add_field(name="Reason", value=reason)
+        muted.set_author(
+            name=interaction.user.name,
+            icon_url=interaction.user.display_avatar,
+        )
+        muted.set_thumbnail(url=member.display_avatar)
+        await interaction.send(embed=muted)
+
+        muted = Embed(
+            color=Color.yellow(),
+            title="Muted!",
+            description=f"You have been muted from the server: **{interaction.guild.name}**!",
+        )
+        muted.add_field(name="Duration", value=f"{duration}s")
+        if reason:
+            muted.add_field(name="Reason", value=reason)
+        muted.set_author(
+            name=interaction.user.name,
+            icon_url=interaction.user.display_avatar,
+        )
+        muted.set_thumbnail(url=interaction.guild.icon)
+        await member.send(embed=muted)
+
+    @application_checks.has_permissions(kick_members=True)
+    @slash_command(name="unmute", description="To remove user's timeout")
+    async def unmute(
+        self,
+        interaction: Interaction,
+        member: Member = SlashOption(
+            name="member", description="The member to timeout", required=True
+        ),
+        reason: str = SlashOption(
+            name="reason", description="The reason of the timeout", required=False
+        ),
+    ):
+        await member.edit(timeout=None)
+
+        unmute = Embed(
+            color=Color.green(),
+            title="Unmuted!",
+            description=f"{member.mention} was unmuted in the server!",
+        )
+        if reason:
+            unmute.add_field(name="Reason", value=reason)
+        unmute.set_author(
+            name=interaction.user.name,
+            icon_url=interaction.user.display_avatar,
+        )
+        unmute.set_thumbnail(url=member.display_avatar)
+        await interaction.send(embed=unmute)
+
+        unmute = Embed(
+            color=Color.green(),
+            title="Unmuted!",
+            description=f"You have been unmuted from the server: **{interaction.guild.name}**!",
+        )
+        if reason:
+            unmute.add_field(name="Reason", value=reason)
+        unmute.set_author(
+            name=interaction.user.name,
+            icon_url=interaction.user.display_avatar,
+        )
+        unmute.set_thumbnail(url=interaction.guild.icon)
+        await member.send(embed=unmute)
 
 
 def setup(client: Bot):
