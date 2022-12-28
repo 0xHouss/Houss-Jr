@@ -10,19 +10,22 @@ from nextcord import (
     slash_command,
 )
 
-import asyncio
+from aiosqlite import Connection, Cursor
 from datetime import datetime
 
 
 class Warnings(Cog):
     def __init__(self, client: Bot) -> None:
         self.client = client
+        client.loop.create_task(self.connect_db())
+
+    async def connect_db(self):
+        self.db: Connection = self.client.db
+        self.cursor: Cursor = await self.db.cursor()
 
     @Cog.listener()
     async def on_ready(self):
-        await asyncio.sleep(2)
-        curr = await self.client.db.cursor()
-        await curr.execute(
+        await self.cursor.execute(
             """CREATE TABLE IF NOT EXISTS "warnings" (
                     "id"	INTEGER NOT NULL UNIQUE,
                     "memberId"	INTEGER NOT NULL,
@@ -32,77 +35,10 @@ class Warnings(Cog):
                     PRIMARY KEY("id" AUTOINCREMENT)
                 );"""
         )
-        await self.client.db.commit()
 
     @slash_command(name="warn")
     async def warn(self, interaction: Interaction):
         return
-
-    @application_checks.has_permissions(kick_members=True)
-    @warn.subcommand(name="list", description="List user's warnings")
-    async def list(
-        self,
-        interaction: Interaction,
-        member: Member = SlashOption(
-            name="member", description="The member to list his warnings", required=True
-        ),
-    ):
-
-        curr = await self.client.db.cursor()
-        await curr.execute(
-            """SELECT * FROM "warnings" WHERE userId = ? AND guildId = ?""",
-            (member.id, interaction.guild_id),
-        )
-
-        warnings = await curr.fetchall()
-        if warnings:
-            warnings_list = Embed(
-                color=Color.green(),
-                title="User Warnings",
-                description=f"{member.mention} warnings:",
-            )
-
-            parser = lambda x: datetime.strptime(x, "%Y-%m-%d %H:%M:%S.%f").strftime(
-                "%d/%m/%Y at %H:%M:%S"
-            )
-
-            i = 1
-            for id, userId, guildId, reason, time in warnings:
-                warnings_list.add_field(
-                    name=f"Warning {i}",
-                    value=f"""
-                        Reason: {reason}
-                        Date: {parser(time)}
-                    """,
-                    inline=False,
-                )
-                i += 1
-
-            warnings_list.set_author(
-                name=self.client.user.display_name,
-                icon_url=self.client.user.display_avatar,
-            )
-            warnings_list.set_thumbnail(url=member.display_avatar)
-            warnings_list.set_footer(
-                text=f"Requested by {interaction.user.name}",
-                icon_url=interaction.user.display_avatar,
-            )
-            await interaction.send(embed=warnings_list)
-
-        else:
-            no_warnings = Embed(
-                color=Color.red(),
-                title="No Warnings!",
-                description=f"{member.mention} has no warnings!",
-            )
-            no_warnings.set_author(
-                name=self.client.user.display_name,
-                icon_url=self.client.user.display_avatar,
-            )
-            no_warnings.set_thumbnail(url=member.display_avatar)
-            await interaction.response.send_message(embed=no_warnings, ephemeral=True)
-
-        await self.client.db.commit()
 
     @application_checks.has_permissions(kick_members=True)
     @warn.subcommand(name="give", description="Warn a user")
@@ -116,9 +52,9 @@ class Warnings(Cog):
             name="reason", description="The reason of the warning", required=False
         ),
     ):
-        curr = await self.client.db.cursor()
-        await curr.execute(
-            """INSERT INTO "warnings" (userId, guildId, reason, datetime) VALUES (?, ?, ?, ?);""",
+        
+        await self.cursor.execute(
+            """INSERT INTO "warnings" (memberId, guildId, reason, datetime) VALUES (?, ?, ?, ?);""",
             (member.id, interaction.guild_id, str(reason), datetime.now()),
         )
 
@@ -153,12 +89,12 @@ class Warnings(Cog):
         warned.set_thumbnail(url=interaction.guild.icon)
         await member.send(embed=warned)
 
-        await curr.execute(
-            """SELECT * FROM "warnings" WHERE userId = ? AND guildId = ?""",
+        await self.cursor.execute(
+            """SELECT * FROM "warnings" WHERE memberId = ? AND guildId = ?""",
             (member.id, interaction.guild_id),
         )
 
-        warnings = await curr.fetchall()
+        warnings = await self.cursor.fetchall()
 
         if len(warnings) == 3:
             kicked = Embed(
@@ -189,7 +125,7 @@ class Warnings(Cog):
             kicked.set_thumbnail(url=interaction.guild.icon)
             await member.send(embed=kicked)
 
-            # await member.kick(reason=reason)
+            # self.client.get_cog("Moderation").kick(interaction, member, reason="3 Warnings")
 
         elif len(warnings) > 3:
             banned = Embed(
@@ -220,14 +156,14 @@ class Warnings(Cog):
             banned.set_thumbnail(url=interaction.guild.icon)
             await member.send(embed=banned)
 
-            # await member.ban(reason=reason)
+            # self.client.get_cog("Moderation").ban(interaction, member, reason="4 Warnings")
 
-            await curr.execute(
-                """DELETE FROM "warnings" WHERE userId = ? AND guildId = ?""",
+            await self.cursor.execute(
+                """DELETE FROM "warnings" WHERE memberId = ? AND guildId = ?""",
                 (member.id, interaction.guild_id),
             )
 
-        await self.client.db.commit()
+        await self.db.commit()
 
     @application_checks.has_permissions(kick_members=True)
     @warn.subcommand(name="remove", description="Remove a user's warning")
@@ -242,36 +178,50 @@ class Warnings(Cog):
             description="The number of the warning to remove (use /warn list to see the warnings",
             required=True,
         ),
+        reason: str = SlashOption(
+            name="reason", description="The reason of the warning", required=False
+        ),
     ):
-        curr = await self.client.db.cursor()
-        await curr.execute(
-            """SELECT * FROM "warnings" WHERE userId = ? AND guildId = ?""",
+        
+        await self.cursor.execute(
+            """SELECT * FROM "warnings" WHERE memberId = ? AND guildId = ?""",
             (member.id, interaction.guild_id),
         )
 
-        warnings = await curr.fetchall()
+        warnings = await self.cursor.fetchall()
         if warnings:
             if number - 1 in range(len(warnings)):
-                await curr.execute(
+                await self.cursor.execute(
                     """DELETE FROM "warnings" WHERE id = ?""",
                     (warnings[number - 1][0],),
                 )
 
-                deleted = Embed(
+                removed = Embed(
                     color=Color.green(),
-                    title="Warning Deleted!",
-                    description=f"{member.mention}'s warning {number} has been deleted!",
+                    title="Warning Removed!",
+                    description=f"{member.mention}'s warning {number} has been removed!",
                 )
-                deleted.set_author(
-                    name=self.client.user.display_name,
-                    icon_url=self.client.user.display_avatar,
-                )
-                deleted.set_thumbnail(url=member.display_avatar)
-                deleted.set_footer(
-                    text=f"Requested by {interaction.user.name}",
+                removed.set_author(
+                    name=interaction.user.name,
                     icon_url=interaction.user.display_avatar,
                 )
-                await interaction.send(embed=deleted)
+                removed.set_thumbnail(url=member.display_avatar)
+                await interaction.send(embed=removed)
+
+                warned = Embed(
+                    color=Color.green(),
+                    title="Warning Removed!",
+                    description=f"Your warning number {number} in {interaction.guild.name} has been removed!",
+                )
+
+                if reason:
+                    warned.add_field(name="Reason", value=reason)
+
+                warned.set_author(
+                    name=interaction.user.name, icon_url=interaction.user.display_avatar
+                )
+                warned.set_thumbnail(url=interaction.guild.icon)
+                await member.send(embed=warned)
             else:
                 no_warnings = Embed(
                     color=Color.red(),
@@ -299,7 +249,7 @@ class Warnings(Cog):
             no_warnings.set_thumbnail(url=member.display_avatar)
             await interaction.response.send_message(embed=no_warnings, ephemeral=True)
 
-        await self.client.db.commit()
+        await self.db.commit()
 
     @application_checks.has_permissions(kick_members=True)
     @warn.subcommand(name="clear", description="Clear user's warnings")
@@ -310,18 +260,17 @@ class Warnings(Cog):
             name="member", description="The member to clear his warnings", required=True
         ),
     ):
-
-        curr = await self.client.db.cursor()
-        await curr.execute(
-            """SELECT * FROM "warnings" WHERE userId = ? AND guildId = ?""",
+        
+        await self.cursor.execute(
+            """SELECT * FROM "warnings" WHERE memberId = ? AND guildId = ?""",
             (member.id, interaction.guild_id),
         )
 
-        warnings = await curr.fetchall()
+        warnings = await self.cursor.fetchall()
 
         if warnings:
-            await curr.execute(
-                """DELETE FROM "warnings" WHERE userId = ? AND guildId = ?""",
+            await self.cursor.execute(
+                """DELETE FROM "warnings" WHERE memberId = ? AND guildId = ?""",
                 (member.id, interaction.guild_id),
             )
 
@@ -331,14 +280,10 @@ class Warnings(Cog):
                 description=f"{member.mention} warnings have been cleared!",
             )
             cleared.set_author(
-                name=self.client.user.display_name,
-                icon_url=self.client.user.display_avatar,
-            )
-            cleared.set_thumbnail(url=member.display_avatar)
-            cleared.set_footer(
-                text=f"Requested by {interaction.user.name}",
+                name=interaction.user.name,
                 icon_url=interaction.user.display_avatar,
             )
+            cleared.set_thumbnail(url=member.display_avatar)
             await interaction.send(embed=cleared)
 
         else:
@@ -354,7 +299,7 @@ class Warnings(Cog):
             no_warnings.set_thumbnail(url=member.display_avatar)
             await interaction.response.send_message(embed=no_warnings, ephemeral=True)
 
-        await self.client.db.commit()
+        await self.db.commit()
 
 
 def setup(client: Bot):

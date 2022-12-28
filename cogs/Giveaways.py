@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from aiosqlite import Connection, Cursor
 
 from nextcord.ext.commands import Cog, Bot
 
@@ -21,12 +22,16 @@ import asyncio
 class Giveaways(Cog):
     def __init__(self, client: Bot) -> None:
         self.client = client
+        client.loop.create_task(self.connect_db())
+
+    async def connect_db(self):
+        self.db: Connection = self.client.db
+        self.cursor: Cursor = await self.db.cursor()
 
     @Cog.listener()
     async def on_ready(self):
-        await asyncio.sleep(2)
-        curr = await self.client.db.cursor()
-        await curr.execute(
+
+        await self.cursor.execute(
             """CREATE TABLE IF NOT EXISTS "giveaways" (
                     "id"	INTEGER NOT NULL UNIQUE,
                     "channelId"	INTEGER NOT NULL,
@@ -39,7 +44,6 @@ class Giveaways(Cog):
                     PRIMARY KEY("id" AUTOINCREMENT)
                 );"""
         )
-        await self.client.db.commit()
 
     @slash_command(name="giveaway")
     async def giveaway(self, interaction: Interaction):
@@ -66,7 +70,7 @@ class Giveaways(Cog):
             required=False,
         ),
     ):
-
+        
         start = datetime.now()
         end = start + timedelta(seconds=duration)
 
@@ -82,8 +86,17 @@ class Giveaways(Cog):
         embed.add_field(name="Number of winners: ", value=winners_num)
         embed.set_footer(text=f"Ends the {end.strftime('%d/%m/%Y at %H:%M:%S')}!")
 
+        
         if not channel:
-            channel = interaction.channel
+            await self.cursor.execute("""SELECT giveawaysChannelId FROM "configs" WHERE guildId = ?""", (interaction.guild_id,))
+
+            giveaways_channel_id = await self.cursor.fetchone()
+
+            if giveaways_channel_id[0]:
+                channel = interaction.guild.get_channel(giveaways_channel_id[0])
+            else:
+                channel = interaction.channel
+
 
         confirmation = Embed(
             title=f"Giveaway!",
@@ -130,9 +143,8 @@ class Giveaways(Cog):
         ended.set_footer(text=f"They have won: {prize}")
 
         await channel.send(embed=ended)
-
-        curr = await self.client.db.cursor()
-        await curr.execute(
+        
+        await self.cursor.execute(
             """INSERT INTO "giveaways" (channelId, guildId, authorId, winners, prize, start, end) VALUES (?, ?, ?, ?, ?, ?, ?);""",
             (
                 channel.id,
@@ -145,7 +157,7 @@ class Giveaways(Cog):
             ),
         )
 
-        await self.client.db.commit()
+        await self.db.commit()
 
     @giveaway.subcommand(name="clear", description="Delete all giveaways")
     async def clear(
@@ -157,23 +169,22 @@ class Giveaways(Cog):
             required=False,
         ),
     ):
-        curr = await self.client.db.cursor()
-
-        await curr.execute(
+        
+        await self.cursor.execute(
             f"""SELECT * FROM "giveaways" WHERE guildId = ? {'AND channelId = ?' if channel else ''}""",
             (interaction.guild.id, channel.id) if channel else (interaction.guild.id,),
         )
 
-        giveaways = await curr.fetchall()
+        giveaways = await self.cursor.fetchall()
 
         if giveaways:
-            await curr.execute(
+            await self.cursor.execute(
                 f"""DELETE FROM "giveaways" WHERE guildId = ? {'AND channelId = ?' if channel else ''}""",
                 (interaction.guild.id, channel.id)
                 if channel
                 else (interaction.guild.id,),
             )
-            await self.client.db.commit()
+            await self.db.commit()
 
             cleared = Embed(
                 color=Color.green(),
@@ -181,14 +192,10 @@ class Giveaways(Cog):
                 description=f"{f'{channel.mention} g' if channel else 'G'}iveaways have been cleared!",
             )
             cleared.set_author(
-                name=self.client.user.display_name,
-                icon_url=self.client.user.display_avatar,
-            )
-            cleared.set_thumbnail(url=interaction.guild.icon)
-            cleared.set_footer(
-                text=f"Requested by {interaction.user.name}",
+                name=interaction.user.name,
                 icon_url=interaction.user.display_avatar,
             )
+            cleared.set_thumbnail(url=interaction.guild.icon)
             await interaction.send(embed=cleared)
         else:
             no_giveaways = Embed(
@@ -212,14 +219,13 @@ class Giveaways(Cog):
             required=False,
         ),
     ):
-        curr = await self.client.db.cursor()
-
-        await curr.execute(
+        
+        await self.cursor.execute(
             f"""SELECT * FROM "giveaways" WHERE guildId = ? {'AND channelId = ?' if channel else ''}""",
             (interaction.guild.id, channel.id) if channel else (interaction.guild.id,),
         )
 
-        giveaways = await curr.fetchall()
+        giveaways = await self.cursor.fetchall()
 
         if giveaways:
             giveaways_list = Embed(
@@ -252,14 +258,10 @@ class Giveaways(Cog):
                 )
 
             giveaways_list.set_author(
-                name=self.client.user.display_name,
-                icon_url=self.client.user.display_avatar,
-            )
-            giveaways_list.set_thumbnail(url=interaction.guild.icon)
-            giveaways_list.set_footer(
-                text=f"Requested by {interaction.user.name}",
+                name=interaction.user.name,
                 icon_url=interaction.user.display_avatar,
             )
+            giveaways_list.set_thumbnail(url=interaction.guild.icon)
             await interaction.send(embed=giveaways_list)
 
         else:
@@ -274,7 +276,7 @@ class Giveaways(Cog):
             )
             await interaction.response.send_message(embed=no_giveaways, ephemeral=True)
 
-        await self.client.db.commit()
+        await self.db.commit()
 
     @giveaway.subcommand(name="remove", description="Remove a user's warning")
     async def remove(
@@ -286,15 +288,15 @@ class Giveaways(Cog):
             required=True,
         ),
     ):
-        curr = await self.client.db.cursor()
-        await curr.execute(
+        
+        await self.cursor.execute(
             """SELECT * FROM "giveaways" WHERE id = ?""",
             (id,),
         )
 
-        giveaways = await curr.fetchall()
+        giveaways = await self.cursor.fetchall()
         if giveaways:
-            await curr.execute(
+            await self.cursor.execute(
                 """DELETE FROM "giveaways" WHERE id = ?""",
                 (id,),
             )
@@ -305,14 +307,10 @@ class Giveaways(Cog):
                 description=f"Giveaway {id} has been deleted!",
             )
             deleted.set_author(
-                name=self.client.user.display_name,
-                icon_url=self.client.user.display_avatar,
-            )
-            deleted.set_thumbnail(url=interaction.guild.icon)
-            deleted.set_footer(
-                text=f"Requested by {interaction.user.name}",
+                name=interaction.user.name,
                 icon_url=interaction.user.display_avatar,
             )
+            deleted.set_thumbnail(url=interaction.guild.icon)
             await interaction.send(embed=deleted)
         else:
             no_warnings = Embed(
@@ -327,7 +325,7 @@ class Giveaways(Cog):
             no_warnings.set_thumbnail(url=interaction.guild.icon)
             await interaction.response.send_message(embed=no_warnings, ephemeral=True)
 
-        await self.client.db.commit()
+        await self.db.commit()
 
 
 def setup(client: Bot):

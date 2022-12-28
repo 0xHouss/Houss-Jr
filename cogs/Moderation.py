@@ -1,6 +1,8 @@
 import asyncio
+from aiosqlite import Connection, Cursor
 
 from nextcord.ext.commands import Cog, Bot
+from numerize.numerize import numerize
 
 from nextcord.abc import GuildChannel
 from nextcord.ext import application_checks
@@ -16,47 +18,21 @@ from nextcord import (
     utils,
 )
 
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 
 class Moderation(Cog):
     def __init__(self, client: Bot) -> None:
         self.client = client
+        client.loop.create_task(self.connect_db())
 
-    @slash_command(name="who")
-    async def who(self, interaction: Interaction):
-        return
-
-    @who.subcommand(name="is", description="Get user's infos")
-    async def who_is(self, interaction: Interaction, member: Member):
-        embed = Embed(
-            title=member.name,
-            description=member.mention,
-            color=Color.blue(),
-        )
-        embed.add_field(name="ID", value=member.id, inline=False)
-        embed.add_field(
-            name="Joined :",
-            value=member.joined_at.strftime("%H:%M | %d %b %Y"),
-            inline=True,
-        )
-        embed.add_field(name="|", value="|", inline=True)
-        embed.add_field(
-            name="Created :",
-            value=member.created_at.strftime("%H:%M | %d %b %Y"),
-            inline=True,
-        )
-
-        embed.set_thumbnail(url=member.display_avatar)
-        embed.set_footer(
-            icon_url=interaction.user.display_avatar,
-            text=f"Requested by {interaction.user.name}",
-        )
-        await interaction.send(embed=embed)
+    async def connect_db(self):
+        self.db: Connection = self.client.db
+        self.cursor: Cursor = await self.db.cursor()
 
     @application_checks.has_permissions(manage_messages=True)
     @slash_command(name="clear", description="To clear a channel")
-    async def clear(
+    async def clear_channel(
         self,
         interaction: Interaction,
         channel: GuildChannel = SlashOption(
@@ -121,12 +97,8 @@ class Moderation(Cog):
         if reason:
             kicked.add_field(name="Reason", value=reason)
         kicked.set_author(
-            name=self.client.user.display_name,
-            icon_url=self.client.user.display_avatar,
-        )
-        kicked.set_footer(
+            name=interaction.user.name,
             icon_url=interaction.user.display_avatar,
-            text=f"Kicked by {interaction.user.name}",
         )
         kicked.set_thumbnail(url=interaction.guild.icon)
         await member.send(embed=kicked)

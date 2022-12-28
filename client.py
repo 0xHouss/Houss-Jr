@@ -1,4 +1,6 @@
+import asyncio
 import os
+import time
 import nextcord
 
 from os import environ as env
@@ -13,7 +15,12 @@ import aiosqlite
 class Client(Bot):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.loop.create_task(self.load_extensions())
+        self.loop.create_task(self.get_ready())
+
+    async def get_ready(self):
+        self.db = await aiosqlite.connect("main.db")
+
+        await self.load_extensions()
 
     async def load_extensions(self) -> None:
         loaded = []
@@ -31,7 +38,6 @@ class Client(Bot):
                 print(f"system: {filename[:-3]} cog loaded.")
 
     async def on_ready(self):
-        self.db = await aiosqlite.connect("main.db")
         print("Ready !")
 
     async def on_command_error(self, ctx: Context, error):
