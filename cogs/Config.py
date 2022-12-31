@@ -57,7 +57,7 @@ class Config(Cog):
             name="channel", description="The greetings channel", required=True
         ),
     ):
-        
+
         await self.cursor.execute(
             """UPDATE "configs" SET greetingsChannelId = ? WHERE guildId = ?""",
             (channel.id, interaction.guild_id),
@@ -88,7 +88,7 @@ class Config(Cog):
             name="channel", description="The levels channel", required=True
         ),
     ):
-        
+
         await self.cursor.execute(
             """UPDATE "configs" SET levelsChannelId = ? WHERE guildId = ?""",
             (channel.id, interaction.guild_id),
@@ -119,7 +119,7 @@ class Config(Cog):
             name="channel", description="The giveaways channel", required=True
         ),
     ):
-        
+
         await self.cursor.execute(
             """UPDATE "configs" SET giveawaysChannelId = ? WHERE guildId = ?""",
             (channel.id, interaction.guild_id),

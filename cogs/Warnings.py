@@ -52,7 +52,7 @@ class Warnings(Cog):
             name="reason", description="The reason of the warning", required=False
         ),
     ):
-        
+
         await self.cursor.execute(
             """INSERT INTO "warnings" (memberId, guildId, reason, datetime) VALUES (?, ?, ?, ?);""",
             (member.id, interaction.guild_id, str(reason), datetime.now()),
@@ -182,7 +182,7 @@ class Warnings(Cog):
             name="reason", description="The reason of the warning", required=False
         ),
     ):
-        
+
         await self.cursor.execute(
             """SELECT * FROM "warnings" WHERE memberId = ? AND guildId = ?""",
             (member.id, interaction.guild_id),

@@ -100,7 +100,7 @@ class Levels(Cog):
         member: Member = message.author
         if not member.bot:
             add = 10 * math.floor(len(message.content) / 30)
-            
+
             await self.cursor.execute(
                 """SELECT xp FROM "levels" WHERE memberId = ? AND guildId = ?""",
                 (member.id, member.guild.id),
@@ -120,7 +120,7 @@ class Levels(Cog):
     @Cog.listener()
     async def on_member_ban(self, guild: Guild, user: User):
         if not user.bot:
-            
+
             await self.cursor.execute(
                 """SELECT * FROM "levels" WHERE memberId = ? AND guildId = ?""",
                 (user.id, guild.id),
@@ -138,7 +138,7 @@ class Levels(Cog):
 
     async def levelup(self, member: Member):
         if not member.bot:
-            
+
             await self.cursor.execute(
                 """SELECT * FROM "levels" WHERE memberId = ? AND guildId = ?""",
                 (member.id, member.guild.id),
@@ -217,7 +217,6 @@ class Levels(Cog):
             name="xp", description="The number of xp to add", required=True
         ),
     ):
-        
 
         await self.cursor.execute(
             """SELECT level, xp FROM "levels" WHERE memberId = ? AND guildId = ?""",

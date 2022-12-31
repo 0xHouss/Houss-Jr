@@ -70,7 +70,7 @@ class Giveaways(Cog):
             required=False,
         ),
     ):
-        
+
         start = datetime.now()
         end = start + timedelta(seconds=duration)
 
@@ -86,9 +86,11 @@ class Giveaways(Cog):
         embed.add_field(name="Number of winners: ", value=winners_num)
         embed.set_footer(text=f"Ends the {end.strftime('%d/%m/%Y at %H:%M:%S')}!")
 
-        
         if not channel:
-            await self.cursor.execute("""SELECT giveawaysChannelId FROM "configs" WHERE guildId = ?""", (interaction.guild_id,))
+            await self.cursor.execute(
+                """SELECT giveawaysChannelId FROM "configs" WHERE guildId = ?""",
+                (interaction.guild_id,),
+            )
 
             giveaways_channel_id = await self.cursor.fetchone()
 
@@ -96,7 +98,6 @@ class Giveaways(Cog):
                 channel = interaction.guild.get_channel(giveaways_channel_id[0])
             else:
                 channel = interaction.channel
-
 
         confirmation = Embed(
             title=f"Giveaway!",
@@ -143,7 +144,7 @@ class Giveaways(Cog):
         ended.set_footer(text=f"They have won: {prize}")
 
         await channel.send(embed=ended)
-        
+
         await self.cursor.execute(
             """INSERT INTO "giveaways" (channelId, guildId, authorId, winners, prize, start, end) VALUES (?, ?, ?, ?, ?, ?, ?);""",
             (
@@ -169,7 +170,7 @@ class Giveaways(Cog):
             required=False,
         ),
     ):
-        
+
         await self.cursor.execute(
             f"""SELECT * FROM "giveaways" WHERE guildId = ? {'AND channelId = ?' if channel else ''}""",
             (interaction.guild.id, channel.id) if channel else (interaction.guild.id,),
@@ -219,7 +220,7 @@ class Giveaways(Cog):
             required=False,
         ),
     ):
-        
+
         await self.cursor.execute(
             f"""SELECT * FROM "giveaways" WHERE guildId = ? {'AND channelId = ?' if channel else ''}""",
             (interaction.guild.id, channel.id) if channel else (interaction.guild.id,),
@@ -288,7 +289,7 @@ class Giveaways(Cog):
             required=True,
         ),
     ):
-        
+
         await self.cursor.execute(
             """SELECT * FROM "giveaways" WHERE id = ?""",
             (id,),

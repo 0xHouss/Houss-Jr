@@ -187,9 +187,9 @@ class Infos(Cog):
         board.add_field(name="Level:", value=level)
         board.add_field(name="XP:", value=f"{numerize(xp)}/{numerize(needed)}")
         board.set_author(
-                name=interaction.user.name,
-                icon_url=interaction.user.display_avatar,
-            )
+            name=interaction.user.name,
+            icon_url=interaction.user.display_avatar,
+        )
 
         await interaction.response.send_message(embed=board, ephemeral=True)
 

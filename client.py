@@ -20,9 +20,9 @@ class Client(Bot):
     async def get_ready(self):
         self.db = await aiosqlite.connect("main.db")
 
-        await self.load_extensions()
+        self.load_extensions()
 
-    async def load_extensions(self) -> None:
+    def load_extensions(self) -> None:
         loaded = []
         for filename in os.listdir("./cogs"):
             if filename.endswith(".py"):
@@ -31,7 +31,7 @@ class Client(Bot):
                 loaded.append(filename[:-3])
         return loaded
 
-    async def unload_extensions(self) -> None:
+    def unload_extensions(self) -> None:
         for filename in os.listdir("./cogs"):
             if filename.endswith(".py"):
                 self.unload_extension(f"cogs.{filename[:-3]}")
